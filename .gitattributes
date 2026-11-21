@@ -1,0 +1,4 @@
+* text=auto
+# Scripts executados dentro do container Linux precisam de LF.
+*.sh text eol=lf
+*.sql text eol=lf
