@@ -1,0 +1,8 @@
+.git
+.env
+target
+Docx
+docker
+*.md
+.idea
+.vscode

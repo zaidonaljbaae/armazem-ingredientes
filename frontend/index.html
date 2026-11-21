@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Armazém de Ingredientes</title>
+<style>
+  :root {
+    --fundo: #f5f6f8;
+    --cartao: #ffffff;
+    --texto: #1f2933;
+    --suave: #616e7c;
+    --borda: #d9dee4;
+    --primaria: #1d5fbf;
+    --erro-fundo: #fdecea;
+    --erro-texto: #a1251b;
+    --ok-fundo: #e7f5ec;
+    --ok-texto: #1d6b3a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--fundo);
+    color: var(--texto);
+    line-height: 1.4;
+  }
+  header { background: var(--primaria); color: #fff; padding: 16px 24px; }
+  header h1 { margin: 0; font-size: 1.4rem; }
+  header p { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
+  main { max-width: 1200px; margin: 0 auto; padding: 20px; display: grid; gap: 20px; }
+  .grade { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  section { background: var(--cartao); border: 1px solid var(--borda); border-radius: 8px; padding: 16px 20px; }
+  h2 { margin: 0 0 12px; font-size: 1.1rem; }
+  form { display: grid; gap: 10px; }
+  label { display: grid; gap: 4px; font-size: .9rem; color: var(--suave); }
+  input, select, button { font: inherit; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 6px; }
+  input, select { color: var(--texto); background: #fff; }
+  button { background: var(--primaria); color: #fff; border-color: var(--primaria); cursor: pointer; font-weight: 600; }
+  button:hover { filter: brightness(1.1); }
+  button.secundario { background: #fff; color: var(--primaria); }
+  .linha { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+  .linha label { flex: 1; min-width: 140px; }
+  #mensagem { display: none; padding: 12px 16px; border-radius: 6px; font-weight: 500; }
+  #mensagem.erro { display: block; background: var(--erro-fundo); color: var(--erro-texto); border: 1px solid #f5c2bd; }
+  #mensagem.ok { display: block; background: var(--ok-fundo); color: var(--ok-texto); border: 1px solid #b7e1c4; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--borda); }
+  th { color: var(--suave); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .vazio { color: var(--suave); font-style: italic; }
+  .rolagem { overflow-x: auto; }
+  .cabecalho { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .cabecalho h2 { margin: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Armazém de Ingredientes</h1>
+  <p>Entrada, saída e consulta do estoque nos compartimentos C1 a C5.</p>
+</header>
+
+<main>
+  <div id="mensagem" role="status" aria-live="polite"></div>
+
+  <div class="grade">
+    <section>
+      <h2>Entrada de ingrediente</h2>
+      <!-- novalidate: quem valida é a API, e a mensagem dela aparece na tela -->
+      <form id="form-entrada" novalidate>
+        <label>Nome
+          <input name="nome" placeholder="Ex.: Farinha de Trigo">
+        </label>
+        <div class="linha">
+          <label>Tipo
+            <select name="tipo">
+              <option value="SECO">Seco</option>
+              <option value="LIQUIDO">Líquido</option>
+              <option value="REFRIGERADO">Refrigerado</option>
+            </select>
+          </label>
+          <label>Quantidade
+            <input name="quantidade" type="number" step="any" placeholder="Ex.: 400">
+          </label>
+        </div>
+        <div class="linha">
+          <label>Compartimento
+            <select name="compartimento" id="entrada-compartimento"></select>
+          </label>
+          <label>Responsável
+            <input name="responsavel" placeholder="Ex.: pedro">
+          </label>
+        </div>
+        <button type="submit">Registrar entrada</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Saída de ingrediente</h2>
+      <form id="form-saida" novalidate>
+        <label>Ingrediente
+          <select name="ingrediente" id="saida-ingrediente"></select>
+        </label>
+        <div class="linha">
+          <label>Quantidade
+            <input name="quantidade" type="number" step="any" placeholder="Ex.: 100">
+          </label>
+          <label>Responsável
+            <input name="responsavel" placeholder="Ex.: maria">
+          </label>
+        </div>
+        <button type="submit">Registrar saída</button>
+      </form>
+    </section>
+  </div>
+
+  <div class="grade">
+    <section>
+      <div class="cabecalho">
+        <h2>Compartimentos</h2>
+        <button type="button" class="secundario" data-atualizar>Atualizar</button>
+      </div>
+      <div class="rolagem">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th><th>Tipo atual</th><th class="num">Quantidade</th>
+              <th class="num">Capacidade</th><th class="num">Espaço livre</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-compartimentos"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Volume por tipo</h2>
+      <table>
+        <thead><tr><th>Tipo</th><th class="num">Total armazenado</th></tr></thead>
+        <tbody id="tabela-volume"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <section>
+    <div class="cabecalho">
+      <h2>Histórico de movimentações</h2>
+      <form id="form-historico" class="linha">
+        <label>Ordenar por
+          <select name="sortBy">
+            <option value="date">Data</option>
+            <option value="compartimento">Compartimento</option>
+          </select>
+        </label>
+        <label>Ordem
+          <select name="order">
+            <option value="desc">Decrescente</option>
+            <option value="asc">Crescente</option>
+          </select>
+        </label>
+        <button type="submit" class="secundario">Aplicar</button>
+      </form>
+    </div>
+    <div class="rolagem">
+      <table>
+        <thead>
+          <tr>
+            <th>Data e hora</th><th>Operação</th><th>Ingrediente</th><th>Tipo</th>
+            <th>Compartimento</th><th class="num">Quantidade</th><th>Responsável</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-historico"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+  const API = "/api";
+  const NOMES_TIPO = { SECO: "Seco", LIQUIDO: "Líquido", REFRIGERADO: "Refrigerado" };
+  const NOMES_OPERACAO = { ENTRADA: "Entrada", SAIDA: "Saída" };
+
+  const $ = (seletor) => document.querySelector(seletor);
+
+  // ---------- Comunicação com a API ----------
+
+  async function chamarApi(caminho, opcoes = {}) {
+    let resposta;
+    try {
+      resposta = await fetch(API + caminho, {
+        ...opcoes,
+        headers: { "Content-Type": "application/json", ...(opcoes.headers || {}) }
+      });
+    } catch (e) {
+      throw new Error("Não foi possível falar com a API. Verifique se ela está no ar.");
+    }
+    const texto = await resposta.text();
+    const corpo = texto ? JSON.parse(texto) : null;
+    if (!resposta.ok) {
+      throw new Error((corpo && corpo.message) || `Erro ${resposta.status} ao chamar a API.`);
+    }
+    return { status: resposta.status, corpo };
+  }
+
+  // ---------- Mensagens ----------
+
+  function mostrarMensagem(texto, tipo) {
+    const caixa = $("#mensagem");
+    caixa.textContent = texto;
+    caixa.className = tipo;
+    caixa.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  // ---------- Formatação (só apresentação) ----------
+
+  function numero(valor) {
+    if (valor === null || valor === undefined) return "—";
+    return Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  }
+
+  function dataHora(valor) {
+    const data = new Date(valor);
+    return isNaN(data) ? valor : data.toLocaleString("pt-BR");
+  }
+
+  function textoOuVazio(valor, nomes) {
+    return valor ? (nomes[valor] || valor) : "—";
+  }
+
+  function preencherTabela(corpo, linhas, colunas, textoVazio) {
+    corpo.replaceChildren();
+    if (linhas.length === 0) {
+      const tr = corpo.insertRow();
+      const td = tr.insertCell();
+      td.colSpan = colunas;
+      td.className = "vazio";
+      td.textContent = textoVazio;
+      return;
+    }
+    for (const celulas of linhas) {
+      const tr = corpo.insertRow();
+      for (const [texto, numerica] of celulas) {
+        const td = tr.insertCell();
+        td.textContent = texto;
+        if (numerica) td.className = "num";
+      }
+    }
+  }
+
+  function preencherSelect(select, opcoes, textoVazio) {
+    const anterior = select.value;
+    select.replaceChildren();
+    if (opcoes.length === 0) {
+      select.add(new Option(textoVazio, ""));
+      return;
+    }
+    for (const [valor, texto] of opcoes) select.add(new Option(texto, valor));
+    if (opcoes.some(([valor]) => valor === anterior)) select.value = anterior;
+  }
+
+  // ---------- Carregamento das tabelas ----------
+
+  async function carregarCompartimentos() {
+    const { corpo } = await chamarApi("/compartimentos");
+    preencherTabela($("#tabela-compartimentos"), corpo.map(c => [
+      [c.codigo], [textoOuVazio(c.tipoAtual, NOMES_TIPO)], [numero(c.quantidadeAtual), true],
+      [numero(c.capacidade), true], [numero(c.espacoLivre), true]
+    ]), 5, "Nenhum compartimento.");
+    preencherSelect($("#entrada-compartimento"),
+      corpo.map(c => [c.codigo, c.codigo + (c.tipoAtual ? " — " + NOMES_TIPO[c.tipoAtual] : " — vazio")]),
+      "Nenhum compartimento");
+  }
+
+  async function carregarVolume() {
+    const { corpo } = await chamarApi("/ingredientes/volume");
+    preencherTabela($("#tabela-volume"),
+      corpo.map(v => [[textoOuVazio(v.type, NOMES_TIPO)], [numero(v.totalQuantity), true]]),
+      2, "Sem dados.");
+  }
+
+  async function carregarIngredientes() {
+    const { corpo } = await chamarApi("/ingredientes");
+    preencherSelect($("#saida-ingrediente"),
+      corpo.map(i => [i.id, `${i.nome} — ${i.compartimento} — ${numero(i.quantidade)} (${NOMES_TIPO[i.tipo] || i.tipo})`]),
+      "Nenhum ingrediente cadastrado");
+  }
+
+  async function carregarHistorico() {
+    const filtros = new URLSearchParams(new FormData($("#form-historico")));
+    const { corpo } = await chamarApi("/historico?" + filtros);
+    preencherTabela($("#tabela-historico"), corpo.map(m => [
+      [dataHora(m.dataHora)], [textoOuVazio(m.operacao, NOMES_OPERACAO)], [m.ingrediente],
+      [textoOuVazio(m.tipo, NOMES_TIPO)], [m.compartimento], [numero(m.quantidade), true], [m.responsavel]
+    ]), 7, "Nenhuma movimentação ainda.");
+  }
+
+  async function atualizarTudo() {
+    try {
+      await Promise.all([carregarCompartimentos(), carregarVolume(), carregarIngredientes(), carregarHistorico()]);
+    } catch (e) {
+      mostrarMensagem(e.message, "erro");
+    }
+  }
+
+  // ---------- Formulários ----------
+
+  function valorOuNulo(texto) {
+    const limpo = (texto || "").trim();
+    return limpo === "" ? null : limpo;
+  }
+
+  $("#form-entrada").addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    const dados = new FormData(evento.target);
+    const corpo = {
+      nome: valorOuNulo(dados.get("nome")),
+      tipo: dados.get("tipo"),
+      quantidade: valorOuNulo(dados.get("quantidade")),
+      compartimento: valorOuNulo(dados.get("compartimento")),
+      responsavel: valorOuNulo(dados.get("responsavel"))
+    };
+    try {
+      const { status, corpo: ingrediente } = await chamarApi("/ingredientes", {
+        method: "POST", body: JSON.stringify(corpo)
+      });
+      const acao = status === 201 ? "cadastrado" : "somado ao estoque existente";
+      mostrarMensagem(`Entrada registrada: ${ingrediente.nome} ${acao} em ${ingrediente.compartimento} `
+        + `(total ${numero(ingrediente.quantidade)}).`, "ok");
+      evento.target.nome.value = "";
+      evento.target.quantidade.value = "";
+      await atualizarTudo();
+    } catch (e) {
+      mostrarMensagem(e.message, "erro");
+    }
+  });
+
+  $("#form-saida").addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    const dados = new FormData(evento.target);
+    const id = dados.get("ingrediente");
+    if (!id) {
+      mostrarMensagem("Cadastre um ingrediente antes de registrar uma saída.", "erro");
+      return;
+    }
+    const corpo = {
+      quantidade: valorOuNulo(dados.get("quantidade")),
+      responsavel: valorOuNulo(dados.get("responsavel"))
+    };
+    try {
+      const { corpo: ingrediente } = await chamarApi(`/ingredientes/${encodeURIComponent(id)}/saida`, {
+        method: "POST", body: JSON.stringify(corpo)
+      });
+      mostrarMensagem(`Saída registrada: ${ingrediente.nome} em ${ingrediente.compartimento} `
+        + `(restam ${numero(ingrediente.quantidade)}).`, "ok");
+      evento.target.quantidade.value = "";
+      await atualizarTudo();
+    } catch (e) {
+      mostrarMensagem(e.message, "erro");
+    }
+  });
+
+  $("#form-historico").addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    try {
+      await carregarHistorico();
+    } catch (e) {
+      mostrarMensagem(e.message, "erro");
+    }
+  });
+
+  document.querySelector("[data-atualizar]").addEventListener("click", atualizarTudo);
+
+  atualizarTudo();
+</script>
+</body>
+</html>
